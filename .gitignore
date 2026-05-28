@@ -15,4 +15,4 @@ build/
 .env
 
 # Agent skills
-.agent_skills
+.agents/skills
