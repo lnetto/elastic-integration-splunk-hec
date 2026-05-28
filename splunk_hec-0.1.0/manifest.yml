@@ -1,0 +1,32 @@
+format_version: 3.4.0
+name: splunk_hec
+title: Splunk HEC
+version: 0.1.0
+description: Ingest JSON events from Splunk HTTP Event Collector (HEC).
+type: integration
+categories:
+  - custom
+conditions:
+  kibana:
+    version: ^9.3.0
+policy_templates:
+  - name: splunk_hec
+    title: Splunk HEC
+    description: Ingest JSON events from Splunk HTTP Event Collector (HEC).
+    inputs:
+      - type: filestream
+        title: Collect Splunk Ingest Actions output via filestream
+        description: Collecting Splunk HEC events written to disk by Splunk Ingest Actions
+      - type: aws-s3
+        title: Collect Splunk Ingest Actions output via aws-s3
+        description: Collecting Splunk HEC events delivered to S3 by Splunk Ingest Actions
+      - type: http_endpoint
+        title: Collect Splunk HEC events via HTTP endpoint
+        description: Collecting Splunk HEC events delivered directly via HTTP
+icons:
+  - src: /img/splunk.svg
+    title: Splunk
+    type: image/svg+xml
+owner:
+  github: elastic/integration-experience
+  type: community

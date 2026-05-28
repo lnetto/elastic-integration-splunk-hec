@@ -1,0 +1,23 @@
+- name: splunk
+  type: group
+  fields:
+    - name: host
+      type: keyword
+      description: The source host.
+    - name: index
+      type: keyword
+      description: The destination index.
+    - name: source
+      type: keyword
+      description: The source name.
+    - name: sourcetype
+      type: keyword
+      description: The source type.
+    - name: bytes
+      type: long
+      description: >-
+        Character length of the raw event string, used as a byte approximation.
+        Sum this field over a time range to approximate equivalent Splunk license consumption.
+    - name: time
+      type: long
+      description: The event timestamp as an epoch.

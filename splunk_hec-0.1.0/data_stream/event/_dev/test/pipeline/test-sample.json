@@ -1,0 +1,7 @@
+{
+  "events": [
+    {
+      "message": "{\"time\": 1779281432, \"event\": \"2026-05-20T12:50:33Z foobar\", \"host\": \"my_host\", \"source\": \"my_source\", \"sourcetype\": \"my_sourcetype\", \"index\": \"my_index\"}"
+    }
+  ]
+}

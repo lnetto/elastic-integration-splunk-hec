@@ -1,0 +1,25 @@
+{
+    "expected": [
+        {
+            "@timestamp": "2026-05-20T12:50:32.000Z",
+            "ecs": {
+                "version": "9.3.0"
+            },
+            "event": {
+                "original": "2026-05-20T12:50:33Z foobar"
+            },
+            "message": "2026-05-20T12:50:33Z foobar",
+            "splunk": {
+                "bytes": 27,
+                "host": "my_host",
+                "index": "my_index",
+                "source": "my_source",
+                "sourcetype": "my_sourcetype",
+                "time": 1779281432
+            },
+            "tags": [
+                "preserve_original_event"
+            ]
+        }
+    ]
+}
