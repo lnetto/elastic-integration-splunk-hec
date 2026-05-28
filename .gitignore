@@ -13,3 +13,6 @@ build/
 
 # Local environment / credentials
 .env
+
+# Agent skills
+.agent_skills
