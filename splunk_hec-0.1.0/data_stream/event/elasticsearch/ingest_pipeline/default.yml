@@ -1,48 +1,8 @@
 ---
 processors:
-  - set:
-      tag: set_ecs_version
-      field: ecs.version
-      value: 9.3.0
-  # Parse the Splunk HEC JSON envelope into splunk.* fields.
-  - json:
-      tag: json_parse_splunk_envelope
-      field: message
-      target_field: splunk
-  # splunk.event is the original log line from the source system — preserve it
-  # before we promote it to message and remove the Splunk envelope.
-  - set:
-      tag: set_event_original
-      field: event.original
-      copy_from: splunk.event
-      ignore_empty_value: true
-      ignore_failure: true
-  - date:
-      tag: set_timestamp
-      field: splunk.time
-      target_field: "@timestamp"
-      formats:
-        - UNIX
-      if: ctx.splunk?.time != null
-  # Remove the raw Splunk envelope string; splunk.* fields carry the metadata.
-  - remove:
-      tag: remove_splunk_envelope
-      field: message
-      ignore_missing: true
-  # Promote splunk.event → message so downstream pipelines get a standard field.
-  - rename:
-      tag: promote_event_to_message
-      field: splunk.event
-      target_field: message
-      ignore_missing: true
-  # Character length of the raw event, used as a byte approximation.
-  # Summing splunk.bytes over a time range approximates equivalent Splunk license usage.
-  - script:
-      tag: calc_event_bytes
-      lang: painless
-      if: ctx.message != null
-      source: >-
-        ctx['splunk']['bytes'] = ctx['message'].length();
+  - pipeline:
+      tag: parse_hec_envelope
+      name: splunk_hec-parse-envelope
 on_failure:
   - set:
       field: event.kind

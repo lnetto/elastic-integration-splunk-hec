@@ -96,28 +96,36 @@ elastic-package test pipeline
 
 ## Routing events by sourcetype
 
-By default all events land in `logs-splunk_hec.event-default`. You can fan them out to sourcetype-specific pipelines — and therefore sourcetype-specific integrations and data streams — using a [`reroute` processor](https://www.elastic.co/guide/en/elasticsearch/reference/current/reroute-processor.html) added to the end of the ingest pipeline.
+You can fan events out to sourcetype-specific integrations using a [`reroute` processor](https://www.elastic.co/guide/en/elasticsearch/reference/current/reroute-processor.html). There are two patterns depending on whether your inputs are mixed or dedicated.
 
-### Where to add reroute processors
+### Shared parsing pipeline
 
-Prefer adding `reroute` processors to the **`@custom` pipeline** rather than editing the integration's built-in pipeline directly. The `@custom` pipeline is called automatically after the integration pipeline and survives integration upgrades without being overwritten.
+The HEC envelope parsing logic lives in a standalone pipeline — `splunk_hec-parse-envelope` — that is called by the integration's built-in pipeline. Any per-sourcetype custom pipeline can call the same shared pipeline, so the parsing logic stays in one place.
 
-The correct pipeline name for this integration is:
+Import it before using either pattern below:
+
+```bash
+curl -X PUT "${ELASTIC_PACKAGE_ELASTICSEARCH_HOST}/_ingest/pipeline/splunk_hec-parse-envelope" \
+  -H "Authorization: ApiKey ${ELASTIC_PACKAGE_ELASTICSEARCH_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @pipelines/splunk_hec-parse-envelope.json
+```
+
+---
+
+### Pattern A — mixed stream with `@custom` pipeline
+
+Use this when a single input receives events from multiple sourcetypes (e.g. one S3 bucket, one HTTP endpoint). All events land in `logs-splunk_hec.event-default`, the integration parses them, then `@custom` reroutes by sourcetype.
 
 ```
-logs-splunk_hec.event@custom
+Agent input (any sourcetype mixed)
+  → logs-splunk_hec.event-default
+      └─ splunk_hec-parse-envelope        ← parsing
+  → logs-splunk_hec.event@custom          ← reroute by if/sourcetype
+  → logs-cisco_asa.log-default            ← Cisco ASA integration runs
 ```
 
-A ready-to-use template with example reroutes is provided at [`pipelines/logs-splunk_hec.event@custom.json`](pipelines/logs-splunk_hec.event@custom.json). Edit it to match your sourcetypes, then import it using one of the methods below.
-
-**Option A — Kibana UI**
-
-1. Go to **Stack Management → Ingest Pipelines → Create pipeline → Load from JSON**
-2. Paste the contents of `pipelines/logs-splunk_hec.event@custom.json`
-3. Set the pipeline name to `logs-splunk_hec.event@custom`
-4. Save
-
-**Option B — Elasticsearch API**
+A ready-to-use template is at [`pipelines/logs-splunk_hec.event@custom.json`](pipelines/logs-splunk_hec.event@custom.json). Edit the sourcetype conditions to match your environment, then import it:
 
 ```bash
 curl -X PUT "${ELASTIC_PACKAGE_ELASTICSEARCH_HOST}/_ingest/pipeline/logs-splunk_hec.event%40custom" \
@@ -126,22 +134,7 @@ curl -X PUT "${ELASTIC_PACKAGE_ELASTICSEARCH_HOST}/_ingest/pipeline/logs-splunk_
   -d @pipelines/logs-splunk_hec.event@custom.json
 ```
 
-> Note the `%40` URL-encoding of `@` in the curl command.
-
-### Example: reroute `cisco:asa` to the Cisco ASA integration
-
-The `reroute` processor sets `data_stream.dataset` to `cisco_asa.log`, routing the document into `logs-cisco_asa.log-default` where the [Elastic Cisco ASA integration](https://www.elastic.co/docs/reference/integrations/cisco_asa) pipeline takes over:
-
-```yaml
-- reroute:
-    tag: reroute_cisco_asa
-    if: ctx.splunk?.sourcetype == "cisco:asa"
-    dataset: cisco_asa.log      # → logs-cisco_asa.log-default
-```
-
-### Routing multiple sourcetypes
-
-Chain as many `reroute` processors as you need — the first match wins:
+Example processors inside `logs-splunk_hec.event@custom`:
 
 ```yaml
 - reroute:
@@ -153,18 +146,48 @@ Chain as many `reroute` processors as you need — the first match wins:
     tag: reroute_palo_alto
     if: ctx.splunk?.sourcetype == "pan:traffic"
     dataset: panw.panos
-
 ```
 
-Events that don't match any rule continue to `logs-splunk_hec.event-default` unchanged.
+Events that don't match any rule stay in `logs-splunk_hec.event-default` unchanged.
+
+---
+
+### Pattern B — dedicated stream per sourcetype
+
+Use this when you have a dedicated input per sourcetype (e.g. a filestream that only collects Cisco ASA logs). Set `data_stream.dataset` in the Elastic Agent policy to a unique value for that input. The per-sourcetype `@custom` pipeline calls the shared parser then reroutes unconditionally — no `if` conditions needed.
+
+```
+Agent input (data_stream.dataset: splunk_hec.cisco_asa)
+  → logs-splunk_hec.cisco_asa-default
+  → logs-splunk_hec.cisco_asa@custom
+      ├─ splunk_hec-parse-envelope        ← shared parsing
+      └─ reroute → cisco_asa.log          ← unconditional
+  → logs-cisco_asa.log-default            ← Cisco ASA integration runs
+```
+
+A ready-to-use template for this is at [`pipelines/logs-splunk_hec.cisco_asa@custom.json`](pipelines/logs-splunk_hec.cisco_asa@custom.json):
+
+```bash
+curl -X PUT "${ELASTIC_PACKAGE_ELASTICSEARCH_HOST}/_ingest/pipeline/logs-splunk_hec.cisco_asa%40custom" \
+  -H "Authorization: ApiKey ${ELASTIC_PACKAGE_ELASTICSEARCH_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d @pipelines/logs-splunk_hec.cisco_asa@custom.json
+```
+
+Copy and adapt this file for each additional sourcetype.
+
+---
 
 ### How the target pipeline is resolved
 
-When Elasticsearch receives a document in `logs-cisco_asa.log-default` it automatically runs the pipeline registered for that index template — so the Cisco ASA integration's own ingest pipeline processes the event without any extra configuration. The `splunk.*` metadata fields are already set by the time the document arrives, so the sourcetype-specific pipeline sees the plain log line in `message` and can parse it normally.
+When Elasticsearch receives a document in `logs-cisco_asa.log-default` it automatically runs the pipeline registered for that index template — so the Cisco ASA integration's own ingest pipeline processes the event without any extra configuration. The `splunk.*` fields and `message` are already set, so the sourcetype-specific pipeline sees the plain log line and can parse it normally.
 
 ### Prerequisites
 
-The target integration must already be installed in Kibana. If the target index template or pipeline doesn't exist, Elasticsearch will reject the rerouted documents.
+- `splunk_hec-parse-envelope` must be imported before the integration or any custom pipeline is used
+- The target integration (e.g. Cisco ASA) must be installed in Kibana — if its index template or pipeline doesn't exist, Elasticsearch will reject rerouted documents
+
+> **Kibana UI alternative:** all pipelines in the `pipelines/` directory can also be imported via **Stack Management → Ingest Pipelines → Create pipeline → Load from JSON**.
 
 ## Estimating Splunk license usage
 

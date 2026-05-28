@@ -1,0 +1,31 @@
+{
+  "description": "Per-sourcetype custom pipeline for Cisco ASA events ingested via a dedicated splunk_hec.cisco_asa dataset. Parses the HEC envelope then reroutes to the Elastic Cisco ASA integration.",
+  "processors": [
+    {
+      "pipeline": {
+        "tag": "parse_hec_envelope",
+        "name": "splunk_hec-parse-envelope"
+      }
+    },
+    {
+      "reroute": {
+        "tag": "reroute_cisco_asa",
+        "dataset": "cisco_asa.log"
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "event.kind",
+        "value": "pipeline_error"
+      }
+    },
+    {
+      "append": {
+        "field": "error.message",
+        "value": "Processor '{{{ _ingest.on_failure_processor_type }}}' with tag '{{{ _ingest.on_failure_processor_tag }}}' in pipeline '{{{ _ingest.pipeline }}}' failed with message '{{{ _ingest.on_failure_message }}}'"
+      }
+    }
+  ]
+}
