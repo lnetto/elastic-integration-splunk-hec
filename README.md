@@ -94,6 +94,54 @@ elastic-package test pipeline
 ./test-event.sh '{"time":1700000000,"host":"myhost","sourcetype":"syslog","event":"hello world"}'
 ```
 
+## Routing events by sourcetype
+
+By default all events land in `logs-splunk_hec.event-default`. You can fan them out to sourcetype-specific pipelines — and therefore sourcetype-specific integrations and data streams — using a [`reroute` processor](https://www.elastic.co/guide/en/elasticsearch/reference/current/reroute-processor.html) added to the end of the ingest pipeline.
+
+### Example: reroute `cisco:asa` to the Cisco ASA integration
+
+Add a `reroute` processor at the end of `splunk_hec-0.1.0/data_stream/event/elasticsearch/ingest_pipeline/default.yml`:
+
+```yaml
+  - reroute:
+      tag: reroute_cisco_asa
+      if: ctx.splunk?.sourcetype == "cisco:asa"
+      dataset: cisco_asa.log      # → logs-cisco_asa.log-default
+```
+
+The processor sets `data_stream.dataset` to `cisco_asa.log`, which routes the document into the `logs-cisco_asa.log-default` index where the [Elastic Cisco ASA integration](https://www.elastic.co/docs/reference/integrations/cisco_asa) pipeline takes over.
+
+### Routing multiple sourcetypes
+
+Chain as many `reroute` processors as you need — the first match wins:
+
+```yaml
+  - reroute:
+      tag: reroute_cisco_asa
+      if: ctx.splunk?.sourcetype == "cisco:asa"
+      dataset: cisco_asa.log
+
+  - reroute:
+      tag: reroute_palo_alto
+      if: ctx.splunk?.sourcetype == "pan:traffic"
+      dataset: panw.panos
+
+  - reroute:
+      tag: reroute_windows
+      if: ctx.splunk?.sourcetype == "XmlWinEventLog:Security"
+      dataset: windows.forwarded
+```
+
+Events that don't match any rule continue to `logs-splunk_hec.event-default` unchanged.
+
+### How the target pipeline is resolved
+
+When Elasticsearch receives a document in `logs-cisco_asa.log-default` it automatically runs the pipeline registered for that index template — so the Cisco ASA integration's own ingest pipeline processes the event without any extra configuration. The `splunk.*` metadata fields are already set by the time the document arrives, so the sourcetype-specific pipeline sees the plain log line in `message` and can parse it normally.
+
+### Prerequisites
+
+The target integration must already be installed in Kibana. If the target index template or pipeline doesn't exist, Elasticsearch will reject the rerouted documents.
+
 ## Estimating Splunk license usage
 
 Every processed event gets a `splunk.bytes` field. Summing it over a time window approximates what Splunk would count against a daily license.
