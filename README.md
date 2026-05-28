@@ -108,24 +108,25 @@ The correct pipeline name for this integration is:
 logs-splunk_hec.event@custom
 ```
 
-Create or edit it in Kibana under **Stack Management → Ingest Pipelines**, or via the Elasticsearch API:
+A ready-to-use template with example reroutes is provided at [`pipelines/logs-splunk_hec.event@custom.json`](pipelines/logs-splunk_hec.event@custom.json). Edit it to match your sourcetypes, then import it using one of the methods below.
+
+**Option A — Kibana UI**
+
+1. Go to **Stack Management → Ingest Pipelines → Create pipeline → Load from JSON**
+2. Paste the contents of `pipelines/logs-splunk_hec.event@custom.json`
+3. Set the pipeline name to `logs-splunk_hec.event@custom`
+4. Save
+
+**Option B — Elasticsearch API**
 
 ```bash
-curl -X PUT "${ELASTIC_PACKAGE_ELASTICSEARCH_HOST}/_ingest/pipeline/logs-splunk_hec.event@custom" \
+curl -X PUT "${ELASTIC_PACKAGE_ELASTICSEARCH_HOST}/_ingest/pipeline/logs-splunk_hec.event%40custom" \
   -H "Authorization: ApiKey ${ELASTIC_PACKAGE_ELASTICSEARCH_API_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{
-    "processors": [
-      {
-        "reroute": {
-          "tag": "reroute_cisco_asa",
-          "if": "ctx.splunk?.sourcetype == \"cisco:asa\"",
-          "dataset": "cisco_asa.log"
-        }
-      }
-    ]
-  }'
+  -d @pipelines/logs-splunk_hec.event@custom.json
 ```
+
+> Note the `%40` URL-encoding of `@` in the curl command.
 
 ### Example: reroute `cisco:asa` to the Cisco ASA integration
 

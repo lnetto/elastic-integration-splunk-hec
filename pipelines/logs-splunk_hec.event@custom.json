@@ -1,0 +1,43 @@
+{
+  "description": "Custom reroute pipeline for the splunk_hec integration. Called automatically after logs-splunk_hec.event-default. Add reroute processors here to fan events out to sourcetype-specific integrations.",
+  "processors": [
+    {
+      "reroute": {
+        "tag": "reroute_cisco_asa",
+        "description": "Route Cisco ASA events to the Elastic Cisco ASA integration",
+        "if": "ctx.splunk?.sourcetype == 'cisco:asa'",
+        "dataset": "cisco_asa.log"
+      }
+    },
+    {
+      "reroute": {
+        "tag": "reroute_palo_alto",
+        "description": "Route Palo Alto PAN-OS events to the Elastic Palo Alto Networks integration",
+        "if": "ctx.splunk?.sourcetype == 'pan:traffic'",
+        "dataset": "panw.panos"
+      }
+    },
+    {
+      "reroute": {
+        "tag": "reroute_windows",
+        "description": "Route Windows Security Event Log events to the Elastic Windows integration",
+        "if": "ctx.splunk?.sourcetype == 'XmlWinEventLog:Security'",
+        "dataset": "windows.forwarded"
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "event.kind",
+        "value": "pipeline_error"
+      }
+    },
+    {
+      "append": {
+        "field": "error.message",
+        "value": "Processor '{{{ _ingest.on_failure_processor_type }}}' with tag '{{{ _ingest.on_failure_processor_tag }}}' in pipeline '{{{ _ingest.pipeline }}}' failed with message '{{{ _ingest.on_failure_message }}}'"
+      }
+    }
+  ]
+}
