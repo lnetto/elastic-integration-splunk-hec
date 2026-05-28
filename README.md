@@ -154,10 +154,6 @@ Chain as many `reroute` processors as you need — the first match wins:
     if: ctx.splunk?.sourcetype == "pan:traffic"
     dataset: panw.panos
 
-- reroute:
-    tag: reroute_windows
-    if: ctx.splunk?.sourcetype == "XmlWinEventLog:Security"
-    dataset: windows.forwarded
 ```
 
 Events that don't match any rule continue to `logs-splunk_hec.event-default` unchanged.

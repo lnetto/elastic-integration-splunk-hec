@@ -17,14 +17,7 @@
         "dataset": "panw.panos"
       }
     },
-    {
-      "reroute": {
-        "tag": "reroute_windows",
-        "description": "Route Windows Security Event Log events to the Elastic Windows integration",
-        "if": "ctx.splunk?.sourcetype == 'XmlWinEventLog:Security'",
-        "dataset": "windows.forwarded"
-      }
-    }
+
   ],
   "on_failure": [
     {
