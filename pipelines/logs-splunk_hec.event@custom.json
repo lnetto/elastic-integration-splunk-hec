@@ -16,8 +16,7 @@
         "if": "ctx.splunk?.sourcetype == 'pan:traffic'",
         "dataset": "panw.panos"
       }
-    },
-
+    }
   ],
   "on_failure": [
     {
