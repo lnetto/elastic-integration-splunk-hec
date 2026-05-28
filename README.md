@@ -98,38 +98,65 @@ elastic-package test pipeline
 
 By default all events land in `logs-splunk_hec.event-default`. You can fan them out to sourcetype-specific pipelines — and therefore sourcetype-specific integrations and data streams — using a [`reroute` processor](https://www.elastic.co/guide/en/elasticsearch/reference/current/reroute-processor.html) added to the end of the ingest pipeline.
 
-### Example: reroute `cisco:asa` to the Cisco ASA integration
+### Where to add reroute processors
 
-Add a `reroute` processor at the end of `splunk_hec-0.1.0/data_stream/event/elasticsearch/ingest_pipeline/default.yml`:
+Prefer adding `reroute` processors to the **`@custom` pipeline** rather than editing the integration's built-in pipeline directly. The `@custom` pipeline is called automatically after the integration pipeline and survives integration upgrades without being overwritten.
 
-```yaml
-  - reroute:
-      tag: reroute_cisco_asa
-      if: ctx.splunk?.sourcetype == "cisco:asa"
-      dataset: cisco_asa.log      # → logs-cisco_asa.log-default
+The correct pipeline name for this integration is:
+
+```
+logs-splunk_hec.event@custom
 ```
 
-The processor sets `data_stream.dataset` to `cisco_asa.log`, which routes the document into the `logs-cisco_asa.log-default` index where the [Elastic Cisco ASA integration](https://www.elastic.co/docs/reference/integrations/cisco_asa) pipeline takes over.
+Create or edit it in Kibana under **Stack Management → Ingest Pipelines**, or via the Elasticsearch API:
+
+```bash
+curl -X PUT "${ELASTIC_PACKAGE_ELASTICSEARCH_HOST}/_ingest/pipeline/logs-splunk_hec.event@custom" \
+  -H "Authorization: ApiKey ${ELASTIC_PACKAGE_ELASTICSEARCH_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "processors": [
+      {
+        "reroute": {
+          "tag": "reroute_cisco_asa",
+          "if": "ctx.splunk?.sourcetype == \"cisco:asa\"",
+          "dataset": "cisco_asa.log"
+        }
+      }
+    ]
+  }'
+```
+
+### Example: reroute `cisco:asa` to the Cisco ASA integration
+
+The `reroute` processor sets `data_stream.dataset` to `cisco_asa.log`, routing the document into `logs-cisco_asa.log-default` where the [Elastic Cisco ASA integration](https://www.elastic.co/docs/reference/integrations/cisco_asa) pipeline takes over:
+
+```yaml
+- reroute:
+    tag: reroute_cisco_asa
+    if: ctx.splunk?.sourcetype == "cisco:asa"
+    dataset: cisco_asa.log      # → logs-cisco_asa.log-default
+```
 
 ### Routing multiple sourcetypes
 
 Chain as many `reroute` processors as you need — the first match wins:
 
 ```yaml
-  - reroute:
-      tag: reroute_cisco_asa
-      if: ctx.splunk?.sourcetype == "cisco:asa"
-      dataset: cisco_asa.log
+- reroute:
+    tag: reroute_cisco_asa
+    if: ctx.splunk?.sourcetype == "cisco:asa"
+    dataset: cisco_asa.log
 
-  - reroute:
-      tag: reroute_palo_alto
-      if: ctx.splunk?.sourcetype == "pan:traffic"
-      dataset: panw.panos
+- reroute:
+    tag: reroute_palo_alto
+    if: ctx.splunk?.sourcetype == "pan:traffic"
+    dataset: panw.panos
 
-  - reroute:
-      tag: reroute_windows
-      if: ctx.splunk?.sourcetype == "XmlWinEventLog:Security"
-      dataset: windows.forwarded
+- reroute:
+    tag: reroute_windows
+    if: ctx.splunk?.sourcetype == "XmlWinEventLog:Security"
+    dataset: windows.forwarded
 ```
 
 Events that don't match any rule continue to `logs-splunk_hec.event-default` unchanged.
